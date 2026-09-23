@@ -14,7 +14,7 @@ Deelnemers scannen de QR-code en sturen woorden in via hun telefoon; op het grot
 - Presentator: `https://<jouw-domein>/presenter` (inloggen met ADMIN_PASSWORD). Zet dit op de beamer.
 - Deelnemers: `https://<jouw-domein>/` of de QR-code op het scherm.
 - Sneltoetsen op het scherm: B beheer, pijltjes vorige/volgende vraag, L insturen open/dicht, Q QR-code tonen/verbergen, F volledig scherm.
-- In het beheerpaneel: vragen vooraf klaarzetten, aantal woorden per deelnemer (1–5), woorden verwijderen, antwoorden wissen en alles exporteren als CSV (opent in Excel).
+- In het beheerpaneel: vragen vooraf klaarzetten, aantal woorden per deelnemer (1–10), woorden verwijderen, antwoorden wissen en alles exporteren als CSV (opent in Excel).
 
 ## Lokaal testen
     pip install -r requirements.txt
