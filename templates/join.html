@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Doe mee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Fraunces:opsz,wght@9..144,500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#E4ECE7; --ink:#16332C; --soft:#5B736C; --accent:#2F6F68; --card:#F7FAF8; --err:#A4462F; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100dvh; background:var(--bg); color:var(--ink);
+         font-family:"Bricolage Grotesque", system-ui, sans-serif;
+         padding:max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); }
+  main { max-width:520px; margin:0 auto; display:flex; flex-direction:column; gap:22px; }
+  .q { font-family:"Fraunces", Georgia, serif; font-weight:500; font-size:clamp(26px, 7vw, 34px);
+       line-height:1.2; margin:8px 0 0; }
+  .muted { color:var(--soft); font-size:16px; margin:0; }
+  form { display:flex; flex-direction:column; gap:12px; }
+  input { font:inherit; font-size:22px; padding:16px 18px; border-radius:14px; border:2px solid #C3D2CA;
+          background:var(--card); color:var(--ink); width:100%; }
+  input:focus { outline:none; border-color:var(--accent); }
+  button { font:inherit; font-weight:600; font-size:20px; padding:16px; border:0; border-radius:14px;
+           background:var(--ink); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.4; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { background:var(--card); border:1px solid #C3D2CA; padding:8px 14px; border-radius:999px; font-size:17px; }
+  .msg { min-height:1.4em; font-size:16px; margin:0; }
+  .msg.err { color:var(--err); }
+  .msg.ok { color:var(--accent); }
+  .wait { text-align:center; padding-top:30vh; }
+</style>
+</head>
+<body>
+<main id="app"><p class="muted wait">Even laden…</p></main>
+<script>
+const app = document.getElementById('app');
+let state = null, stateKey = '', busy = false;
+
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function render(){
+  if (!state || !state.question){
+    app.innerHTML = '<p class="muted wait">Wacht even, de eerste vraag komt zo.</p>'; return;
+  }
+  const left = state.max_words - state.mine.length;
+  const canSend = state.open && left > 0;
+  const hadFocus = document.activeElement && document.activeElement.id === 'w';
+  const draft = document.getElementById('w')?.value || '';
+  app.innerHTML = `
+    <h1 class="q">${esc(state.question.text)}</h1>
+    ${canSend ? `
+      <form id="f" autocomplete="off">
+        <input id="w" maxlength="40" placeholder="Jouw woord" enterkeyhint="send" autocapitalize="none">
+        <button id="b" type="submit">Verstuur</button>
+      </form>
+      <p class="muted">Je kunt nog ${left} ${left===1?'woord':'woorden'} insturen.</p>`
+    : `<p class="muted">${!state.open ? 'Insturen is gesloten. Kijk naar het scherm.' :
+        'Dank je! Je woorden staan in de wolk.'}</p>`}
+    ${state.mine.length ? `<div class="chips">${state.mine.map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div>` : ''}
+    <p class="msg" id="msg"></p>`;
+  const f = document.getElementById('f');
+  if (f){
+    const w = document.getElementById('w');
+    w.value = draft;
+    if (hadFocus) w.focus();
+    f.addEventListener('submit', send);
+  }
+}
+
+async function load(){
+  try{
+    const r = await fetch('/api/state', {cache:'no-store'});
+    const s = await r.json();
+    const key = JSON.stringify(s);
+    if (key !== stateKey){ state = s; stateKey = key; render(); }
+  }catch(e){}
+}
+
+async function send(e){
+  e.preventDefault();
+  if (busy) return;
+  const w = document.getElementById('w'), msg = document.getElementById('msg');
+  const word = w.value.trim();
+  if (!word){ msg.className='msg err'; msg.textContent='Typ eerst een woord.'; return; }
+  busy = true; document.getElementById('b').disabled = true;
+  try{
+    const r = await fetch('/api/submit', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({word, question_id: state.question.id})});
+    const d = await r.json();
+    if (!r.ok){ msg.className='msg err'; msg.textContent=d.error || 'Versturen lukte niet.'; }
+    else { w.value=''; }
+  }catch(err){ msg.className='msg err'; msg.textContent='Geen verbinding. Probeer het opnieuw.'; }
+  busy = false;
+  const b = document.getElementById('b'); if (b) b.disabled = false;
+  const keep = msg.textContent, cls = msg.className;
+  await load();
+  const m2 = document.getElementById('msg'); if (m2 && keep){ m2.textContent = keep; m2.className = cls; }
+}
+
+load(); setInterval(load, 3000);
+</script>
+</body>
+</html>

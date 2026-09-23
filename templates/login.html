@@ -1,1 +1,26 @@
-
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presentator</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:#E4ECE7; color:#16332C;
+         font-family:"Bricolage Grotesque", system-ui, sans-serif; }
+  form { display:flex; flex-direction:column; gap:12px; width:min(340px, 90vw); }
+  h1 { font-weight:600; font-size:24px; margin:0 0 6px; }
+  input, button { font:inherit; font-size:18px; padding:14px 16px; border-radius:12px; }
+  input { border:2px solid #C3D2CA; background:#F7FAF8; }
+  button { border:0; background:#16332C; color:#fff; font-weight:600; cursor:pointer; }
+  .err { color:#A4462F; margin:0; }
+</style>
+</head>
+<body>
+<form method="post">
+  <h1>Inloggen als presentator</h1>
+  <input type="password" name="password" placeholder="Wachtwoord" autofocus>
+  <button type="submit">Inloggen</button>
+  {% if error %}<p class="err">{{ error }}</p>{% endif %}
+</form>
+</body>
+</html>

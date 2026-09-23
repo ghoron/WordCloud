@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordcloud – presentator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Fraunces:opsz,wght@9..144,500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#E4ECE7; --ink:#16332C; --soft:#5B736C; --line:#C3D2CA; --card:#F7FAF8; --err:#A4462F; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font-family:"Bricolage Grotesque", system-ui, sans-serif;
+         display:grid; grid-template-rows:auto 1fr; overflow:hidden; }
+  header { display:flex; align-items:flex-start; justify-content:space-between; gap:32px; padding:36px 48px 0; }
+  #question { font-family:"Fraunces", Georgia, serif; font-weight:500; font-size:clamp(28px, 3.6vw, 56px);
+              line-height:1.15; margin:0; max-width:28ch; }
+  .meta { text-align:right; white-space:nowrap; padding-top:8px; }
+  #count { font-size:clamp(28px, 3vw, 48px); font-weight:800; line-height:1; }
+  .meta small { display:block; color:var(--soft); font-size:16px; margin-top:4px; }
+  .closed { display:inline-block; margin-top:12px; padding:6px 14px; border-radius:999px; background:var(--ink);
+            color:#fff; font-size:15px; }
+  #stage { position:relative; margin:12px 48px 40px; }
+  .word { position:absolute; left:0; top:0; font-weight:800; line-height:1; white-space:nowrap; letter-spacing:-0.01em;
+          transition:transform .7s cubic-bezier(.2,.8,.2,1), font-size .7s cubic-bezier(.2,.8,.2,1), opacity .5s;
+          will-change:transform; }
+  .word.new { opacity:0; }
+  .empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--soft); font-size:22px; text-align:center; }
+  .closed[hidden] { display:none; }
+  #qr { position:fixed; left:32px; bottom:28px; background:var(--card); border-radius:18px; padding:16px;
+        display:flex; gap:16px; align-items:center; box-shadow:0 2px 0 var(--line); }
+  #qr img { width:132px; height:132px; display:block; }
+  #qr p { margin:0; font-size:16px; color:var(--soft); }
+  #qr strong { display:block; font-size:22px; color:var(--ink); margin-top:4px; }
+  #qr.hidden { display:none; }
+  #toggle { position:fixed; right:24px; bottom:24px; font:inherit; font-weight:600; font-size:15px; padding:10px 16px;
+            border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; opacity:.55; }
+  #toggle:hover, #toggle:focus-visible { opacity:1; }
+  aside { position:fixed; top:0; right:0; bottom:0; width:min(420px, 100vw); background:var(--card);
+          border-left:1px solid var(--line); padding:24px; overflow:auto; transform:translateX(100%);
+          transition:transform .3s ease; display:flex; flex-direction:column; gap:22px; z-index:10; }
+  aside.open { transform:none; }
+  aside h2 { font-size:17px; font-weight:600; margin:0 0 10px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  aside input[type=text], aside select { font:inherit; font-size:16px; padding:10px 12px; border-radius:10px;
+          border:1px solid var(--line); background:#fff; color:var(--ink); }
+  aside input[type=text] { flex:1; min-width:0; }
+  .btn { font:inherit; font-size:15px; font-weight:600; padding:10px 14px; border-radius:10px; border:0;
+         background:var(--ink); color:#fff; cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .btn.danger { background:transparent; color:var(--err); border:1px solid var(--err); }
+  ol { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  ol li { display:flex; gap:8px; align-items:center; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+          cursor:pointer; }
+  ol li.active { border-color:var(--ink); background:#E4ECE7; }
+  ol li span { flex:1; font-size:15px; }
+  ol li em { font-style:normal; color:var(--soft); font-size:13px; }
+  .x { border:0; background:none; color:var(--soft); font-size:18px; cursor:pointer; padding:0 4px; }
+  .x:hover { color:var(--err); }
+  .words { display:flex; flex-wrap:wrap; gap:6px; }
+  .words button { font:inherit; font-size:14px; padding:6px 10px; border-radius:999px; border:1px solid var(--line);
+                  background:#fff; color:var(--ink); cursor:pointer; }
+  .words button:hover { border-color:var(--err); color:var(--err); text-decoration:line-through; }
+  .hint { color:var(--soft); font-size:13px; margin:6px 0 0; line-height:1.5; }
+  :focus-visible { outline:3px solid #2F6F68; outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce) { .word, aside { transition:none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="question">Nog geen vraag</h1>
+  <div class="meta">
+    <div id="count">0</div><small>deelnemers</small>
+    <div id="closedPill" class="closed" hidden>Insturen gesloten</div>
+  </div>
+</header>
+<div id="stage"></div>
+
+<div id="qr">
+  <img src="/qr.svg" alt="QR-code om mee te doen">
+  <div><p>Scan of ga naar</p><strong>{{ join_url.replace('https://','').replace('http://','') }}</strong></div>
+</div>
+
+<button id="toggle" title="Sneltoets B">Beheer</button>
+
+<aside id="panel" aria-label="Beheer">
+  <div class="row" style="justify-content:space-between">
+    <h2 style="margin:0">Beheer</h2>
+    <button class="x" id="close" aria-label="Sluiten">✕</button>
+  </div>
+
+  <section>
+    <h2>Vragen</h2>
+    <ol id="qlist"></ol>
+    <form id="addForm" class="row" style="margin-top:10px">
+      <input type="text" id="newQ" placeholder="Nieuwe vraag" maxlength="200">
+      <button class="btn" type="submit">Toevoegen</button>
+    </form>
+    <p class="hint">Klik op een vraag om hem te tonen. Pijltjestoetsen ← → wisselen ook.</p>
+  </section>
+
+  <section>
+    <h2>Instellingen deze sessie</h2>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn ghost" id="openBtn"></button>
+      <label class="row">Woorden per deelnemer
+        <select id="maxWords">
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Woorden bij deze vraag</h2>
+    <div class="words" id="wordlist"></div>
+    <p class="hint">Klik op een woord om het uit de wolk te verwijderen.</p>
+  </section>
+
+  <section class="row" style="flex-wrap:wrap">
+    <a class="btn ghost" href="/export.csv">Exporteer alles (CSV)</a>
+    <button class="btn danger" id="clearBtn">Wis antwoorden deze vraag</button>
+    <a class="btn ghost" href="/logout">Uitloggen</a>
+  </section>
+  <p class="hint">Sneltoetsen: B beheer, Q QR-code, L open/dicht, F volledig scherm.</p>
+</aside>
+
+<script>
+const PALETTE = ['#16332C', '#2F6F68', '#8A3D6B', '#B4782A', '#A4462F', '#3E5C8A'];
+const FONT = '"Bricolage Grotesque", system-ui, sans-serif';
+const stage = document.getElementById('stage');
+const panel = document.getElementById('panel');
+const measureCtx = document.createElement('canvas').getContext('2d');
+let data = null, lastKey = '', lastCloudKey = '', nodes = new Map();
+
+const api = (url, body, method='POST') => fetch(url, {method, headers:{'Content-Type':'application/json'},
+  body: body ? JSON.stringify(body) : undefined}).then(r => { if (r.status === 401) location.href='/login'; return r; });
+
+function hash(s){ let h=0; for (const c of s) h = (h*31 + c.charCodeAt(0)) >>> 0; return h; }
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ---------- wolk ----------
+function layout(words, W, H, obstacles=[]){
+  if (!words.length) return [];
+  const maxC = words[0].count, minC = words[words.length-1].count;
+  const n = words.length;
+  let maxSize = Math.min(H * 0.22, W / Math.max(4, words[0].word.length * 0.62));
+  let minSize = Math.max(16, Math.min(28, H * 0.035));
+  for (let attempt = 0; attempt < 12; attempt++){
+    const placed = obstacles.map(o => ({...o})), out = [];
+    let ok = true;
+    for (const w of words){
+      const t = maxC === minC ? (n <= 3 ? 1 : 0.55) : Math.sqrt((w.count - minC) / (maxC - minC));
+      const size = Math.round(minSize + (maxSize - minSize) * t);
+      measureCtx.font = `800 ${size}px ${FONT}`;
+      const bw = measureCtx.measureText(w.word).width, bh = size * 1.0;
+      const pad = size * 0.12;
+      let pos = null;
+      for (let i = 0; i < 4000; i++){
+        const a = i * 0.13, r = 2.2 * a;
+        const x = W/2 + r * Math.cos(a) * (W/H) * 0.9 - bw/2;
+        const y = H/2 + r * Math.sin(a) - bh/2;
+        if (x < 0 || y < 0 || x + bw > W || y + bh > H) continue;
+        if (!placed.some(p => x < p.x + p.w + pad && x + bw + pad > p.x && y < p.y + p.h + pad && y + bh + pad > p.y)){
+          pos = {x, y}; break;
+        }
+      }
+      if (!pos){ ok = false; break; }
+      placed.push({x: pos.x, y: pos.y, w: bw, h: bh});
+      out.push({...w, size, x: pos.x, y: pos.y});
+    }
+    if (ok) return out;
+    maxSize *= 0.86; minSize = Math.max(12, minSize * 0.92);
+  }
+  return [];
+}
+
+function drawCloud(){
+  const words = data?.words || [];
+  const W = stage.clientWidth, H = stage.clientHeight;
+  const key = JSON.stringify(words) + W + 'x' + H;
+  if (key === lastCloudKey) return;
+  lastCloudKey = key;
+  stage.querySelector('.empty')?.remove();
+  if (!words.length){
+    for (const el of nodes.values()) el.remove();
+    nodes.clear();
+    const e = document.createElement('div'); e.className = 'empty';
+    e.textContent = data?.question ? 'Wachten op de eerste woorden…' : 'Voeg een vraag toe via Beheer (B).';
+    stage.appendChild(e); return;
+  }
+  const obstacles = [];
+  const qr = document.getElementById('qr');
+  if (!qr.classList.contains('hidden')){
+    const a = qr.getBoundingClientRect(), b = stage.getBoundingClientRect();
+    obstacles.push({x: a.left - b.left, y: a.top - b.top, w: a.width, h: a.height});
+  }
+  const placed = layout(words, W, H, obstacles);
+  const seen = new Set();
+  for (const p of placed){
+    seen.add(p.word);
+    let el = nodes.get(p.word);
+    const isNew = !el;
+    if (isNew){
+      el = document.createElement('span');
+      el.className = 'word new';
+      el.textContent = p.word;
+      el.style.color = PALETTE[hash(p.word) % PALETTE.length];
+      stage.appendChild(el); nodes.set(p.word, el);
+    }
+    el.style.fontSize = p.size + 'px';
+    el.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    el.title = `${p.count}×`;
+    if (isNew) requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('new')));
+  }
+  for (const [w, el] of nodes){ if (!seen.has(w)){ el.remove(); nodes.delete(w); } }
+}
+
+// ---------- beheer ----------
+function renderPanel(){
+  const d = data;
+  document.getElementById('question').textContent = d.question || 'Nog geen vraag';
+  document.getElementById('count').textContent = d.participants;
+  document.getElementById('closedPill').hidden = d.open || !d.question;
+  document.getElementById('openBtn').textContent = d.open ? 'Insturen sluiten' : 'Insturen openen';
+  document.getElementById('maxWords').value = d.max_words;
+  document.getElementById('qlist').innerHTML = d.questions.map(q => `
+    <li data-id="${q.id}" class="${q.id === d.current ? 'active' : ''}">
+      <span>${esc(q.text)}</span><em>${q.participants} pers.</em>
+      <button class="x" data-del="${q.id}" aria-label="Vraag verwijderen">✕</button>
+    </li>`).join('');
+  document.getElementById('wordlist').innerHTML = d.words.length
+    ? d.words.map(w => `<button data-word="${esc(w.word)}">${esc(w.word)} · ${w.count}</button>`).join('')
+    : '<p class="hint" style="margin:0">Nog geen woorden.</p>';
+}
+
+async function load(){
+  try{
+    const r = await api('/api/admin/overview', null, 'GET');
+    if (!r.ok) return;
+    const d = await r.json();
+    const key = JSON.stringify(d);
+    if (key !== lastKey){
+      if (data && data.current !== d.current){ for (const el of nodes.values()) el.remove(); nodes.clear(); }
+      data = d; lastKey = key; renderPanel(); drawCloud();
+    }
+  }catch(e){}
+}
+
+async function go(step){
+  if (!data?.questions.length) return;
+  const i = data.questions.findIndex(q => q.id === data.current);
+  const next = data.questions[Math.max(0, Math.min(data.questions.length-1, i + step))];
+  if (next && next.id !== data.current){ await api('/api/admin/current', {id: next.id}); load(); }
+}
+
+document.getElementById('qlist').addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]');
+  if (del){
+    e.stopPropagation();
+    if (confirm('Deze vraag en alle antwoorden verwijderen?')){ await api('/api/admin/questions/' + del.dataset.del, null, 'DELETE'); load(); }
+    return;
+  }
+  const li = e.target.closest('li');
+  if (li){ await api('/api/admin/current', {id: +li.dataset.id}); load(); }
+});
+document.getElementById('addForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const inp = document.getElementById('newQ');
+  if (!inp.value.trim()) return;
+  await api('/api/admin/questions', {text: inp.value}); inp.value = ''; load();
+});
+document.getElementById('openBtn').onclick = async () => { await api('/api/admin/settings', {open: !data.open}); load(); };
+document.getElementById('maxWords').onchange = async e => { await api('/api/admin/settings', {max_words: +e.target.value}); load(); };
+document.getElementById('wordlist').addEventListener('click', async e => {
+  const b = e.target.closest('[data-word]'); if (!b) return;
+  await api('/api/admin/remove_word', {question_id: data.current, word: b.dataset.word}); load();
+});
+document.getElementById('clearBtn').onclick = async () => {
+  if (data?.current && confirm('Alle antwoorden bij deze vraag wissen?')){ await api('/api/admin/clear', {question_id: data.current}); load(); }
+};
+const togglePanel = () => panel.classList.toggle('open');
+document.getElementById('toggle').onclick = togglePanel;
+document.getElementById('close').onclick = togglePanel;
+
+document.addEventListener('keydown', async e => {
+  if (e.target.matches('input, select, textarea')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'arrowright') go(1);
+  else if (k === 'arrowleft') go(-1);
+  else if (k === 'b') togglePanel();
+  else if (k === 'q'){ document.getElementById('qr').classList.toggle('hidden'); lastCloudKey=''; drawCloud(); }
+  else if (k === 'l' && data){ await api('/api/admin/settings', {open: !data.open}); load(); }
+  else if (k === 'f'){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
+});
+
+let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawCloud, 150); });
+document.fonts.ready.then(() => { load(); setInterval(load, 2000); });
+</script>
+</body>
+</html>
