@@ -105,7 +105,7 @@
       <button class="btn ghost" id="openBtn"></button>
       <label class="row">Woorden per deelnemer
         <select id="maxWords">
-          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
         </select>
       </label>
     </div>
@@ -165,7 +165,7 @@ function layout(words, W, H, obstacles=[]){
           pos = {x, y}; break;
         }
       }
-      if (!pos){ ok = false; break; }
+      if (!pos){ if (attempt < 11){ ok = false; break; } continue; }
       placed.push({x: pos.x, y: pos.y, w: bw, h: bh});
       out.push({...w, size, x: pos.x, y: pos.y});
     }
